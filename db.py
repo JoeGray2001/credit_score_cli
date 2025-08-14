@@ -1,10 +1,18 @@
 import sqlite3
+import logging
 from pathlib import Path
+
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 
 DB_PATH = Path("credit_score.db")
 
 def get_connection():
-    return sqlite3.connect(DB_PATH)
+    try: 
+        conn = sqlite3.connect(DB_PATH)
+        return conn
+    except sqlite3.Error as e:
+        logging.error(f"Error connecting to database: {e}")
+        raise
 
 def init_db():
     with get_connection() as conn:

@@ -23,7 +23,7 @@ class TestCreditApp(unittest.TestCase):
         self.db_patcher = patch.object(db, 'DB_PATH', self.test_db_path)
         self.db_patcher.start()
         
-        # Initialize test database
+        # init test db
         db.init_db()
     
     def tearDown(self):
