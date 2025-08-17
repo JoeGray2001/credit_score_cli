@@ -8,6 +8,7 @@ from pathlib import Path
 
 # Import the modules to test
 import auth
+import credit_info
 import db
 
 class TestCreditApp(unittest.TestCase):
@@ -120,7 +121,7 @@ class TestCreditScoring(TestCreditApp):
     def test_calculate_credit_score_v2_basic(self):
         """Test basic credit score calculation."""
         # Test with good credit profile
-        score = auth.calculate_credit_score_v2(
+        score = credit_info.calculate_credit_score_v2(
             age=35,
             income=60000,
             debts=10000,
@@ -137,7 +138,7 @@ class TestCreditScoring(TestCreditApp):
     def test_calculate_credit_score_v2_edge_cases(self):
         """Test credit score calculation with edge cases."""
         # Test with zero income (high risk)
-        score_zero_income = auth.calculate_credit_score_v2(
+        score_zero_income = credit_info.calculate_credit_score_v2(
             age=25,
             income=0,
             debts=5000,
@@ -151,7 +152,7 @@ class TestCreditScoring(TestCreditApp):
         self.assertLessEqual(score_zero_income, 850)
         
         # Test with very high income and low debt (good profile)
-        score_good_profile = auth.calculate_credit_score_v2(
+        score_good_profile = credit_info.calculate_credit_score_v2(
             age=45,
             income=150000,
             debts=5000,
@@ -173,9 +174,9 @@ class TestCreditScoring(TestCreditApp):
             'credit_history_years': 5
         }
         
-        score_no_missed = auth.calculate_credit_score_v2(**base_params, missed_payments=0)
-        score_one_missed = auth.calculate_credit_score_v2(**base_params, missed_payments=1)
-        score_multiple_missed = auth.calculate_credit_score_v2(**base_params, missed_payments=3)
+        score_no_missed = credit_info.calculate_credit_score_v2(**base_params, missed_payments=0)
+        score_one_missed = credit_info.calculate_credit_score_v2(**base_params, missed_payments=1)
+        score_multiple_missed = credit_info.calculate_credit_score_v2(**base_params, missed_payments=3)
         
         # More missed payments should result in lower scores
         self.assertGreater(score_no_missed, score_one_missed)
@@ -191,12 +192,12 @@ class TestCreditScoring(TestCreditApp):
         }
         
         # Low DTI (good)
-        score_low_dti = auth.calculate_credit_score_v2(
+        score_low_dti = credit_info.calculate_credit_score_v2(
             **base_params, income=60000, debts=6000  # 10% DTI
         )
         
         # High DTI (bad)
-        score_high_dti = auth.calculate_credit_score_v2(
+        score_high_dti = credit_info.calculate_credit_score_v2(
             **base_params, income=60000, debts=36000  # 60% DTI
         )
         
@@ -214,7 +215,7 @@ class TestCreditInfoManagement(TestCreditApp):
     
     def test_update_credit_info_success(self):
         """Test successful credit info update."""
-        result = auth.update_credit_info(
+        result = credit_info.update_credit_info(
             username="testuser",
             age=30,
             income=50000,
@@ -227,22 +228,22 @@ class TestCreditInfoManagement(TestCreditApp):
         self.assertTrue(result)
         
         # Verify data was stored correctly
-        user_data = auth.get_user_info_and_score("testuser")
+        user_data = credit_info.get_user_info_and_score("testuser")
         self.assertIsNotNone(user_data)
         self.assertIsNotNone(user_data['credit_info'])
-        
-        credit_info = user_data['credit_info']
-        self.assertEqual(credit_info[0], 30)  # age
-        self.assertEqual(credit_info[1], 50000)  # income
-        self.assertEqual(credit_info[2], 15000)  # debts
-        self.assertEqual(credit_info[3], 1)  # missed_payments
-        self.assertEqual(credit_info[4], 5)  # employment_length_years
-        self.assertEqual(credit_info[5], 8)  # credit_history_years
-        self.assertIsNotNone(credit_info[6])  # credit_score should be calculated
+
+        credit_info_record = user_data['credit_info']
+        self.assertEqual(credit_info_record[0], 30)  # age
+        self.assertEqual(credit_info_record[1], 50000)  # income
+        self.assertEqual(credit_info_record[2], 15000)  # debts
+        self.assertEqual(credit_info_record[3], 1)  # missed_payments
+        self.assertEqual(credit_info_record[4], 5)  # employment_length_years
+        self.assertEqual(credit_info_record[5], 8)  # credit_history_years
+        self.assertIsNotNone(credit_info_record[6])  # credit_score should be calculated
     
     def test_update_credit_info_nonexistent_user(self):
         """Test updating credit info for non-existent user fails."""
-        result = auth.update_credit_info(
+        result = credit_info.update_credit_info(
             username="nonexistent",
             age=30,
             income=50000,
@@ -256,7 +257,7 @@ class TestCreditInfoManagement(TestCreditApp):
     
     def test_get_user_info_and_score_no_credit_info(self):
         """Test getting user info when no credit info exists."""
-        user_data = auth.get_user_info_and_score("testuser")
+        user_data = credit_info.get_user_info_and_score("testuser")
         
         self.assertIsNotNone(user_data)
         self.assertEqual(user_data['username'], "testuser")
@@ -266,7 +267,7 @@ class TestCreditInfoManagement(TestCreditApp):
     
     def test_get_user_info_and_score_nonexistent_user(self):
         """Test getting info for non-existent user returns None."""
-        user_data = auth.get_user_info_and_score("nonexistent")
+        user_data = credit_info.get_user_info_and_score("nonexistent")
         self.assertIsNone(user_data)
 
 class TestCreditAdvice(TestCreditApp):
@@ -281,7 +282,7 @@ class TestCreditAdvice(TestCreditApp):
     def test_get_credit_advice_high_debts(self):
         """Test advice for user with high debts."""
         # Update with high debt scenario
-        auth.update_credit_info(
+        credit_info.update_credit_info(
             username="testuser",
             age=30,
             income=30000,
@@ -291,7 +292,7 @@ class TestCreditAdvice(TestCreditApp):
             credit_history_years=5
         )
         
-        advice = auth.get_credit_advice("testuser")
+        advice = credit_info.get_credit_advice("testuser")
         self.assertIsNotNone(advice)
         self.assertIn('credit_score', advice)
         self.assertIn('advice', advice)
@@ -303,7 +304,7 @@ class TestCreditAdvice(TestCreditApp):
     def test_get_credit_advice_missed_payments(self):
         """Test advice for user with missed payments."""
         # Update with missed payments
-        auth.update_credit_info(
+        credit_info.update_credit_info(
             username="testuser",
             age=30,
             income=50000,
@@ -313,7 +314,7 @@ class TestCreditAdvice(TestCreditApp):
             credit_history_years=5
         )
         
-        advice = auth.get_credit_advice("testuser")
+        advice = credit_info.get_credit_advice("testuser")
         self.assertIsNotNone(advice)
         
         # Should contain advice about missed payments
@@ -323,7 +324,7 @@ class TestCreditAdvice(TestCreditApp):
     def test_get_credit_advice_good_profile(self):
         """Test advice for user with good credit profile."""
         # Update with good credit profile
-        auth.update_credit_info(
+        credit_info.update_credit_info(
             username="testuser",
             age=35,
             income=80000,
@@ -333,7 +334,7 @@ class TestCreditAdvice(TestCreditApp):
             credit_history_years=12
         )
         
-        advice = auth.get_credit_advice("testuser")
+        advice = credit_info.get_credit_advice("testuser")
         self.assertIsNotNone(advice)
         
         # Positive advice
@@ -342,12 +343,12 @@ class TestCreditAdvice(TestCreditApp):
     
     def test_get_credit_advice_no_credit_info(self):
         """Test advice for user with no credit info."""
-        advice = auth.get_credit_advice("testuser")
+        advice = credit_info.get_credit_advice("testuser")
         self.assertIsNone(advice)
     
     def test_get_credit_advice_nonexistent_user(self):
         """Test advice for non-existent user."""
-        advice = auth.get_credit_advice("nonexistent")
+        advice = credit_info.get_credit_advice("nonexistent")
         self.assertIsNone(advice)
 
 class TestDatabaseFunctions(TestCreditApp):
@@ -388,7 +389,7 @@ class TestIntegration(TestCreditApp):
         self.assertTrue(auth_success)
         
         # Update credit info
-        update_success = auth.update_credit_info(
+        update_success = credit_info.update_credit_info(
             username="integrationuser",
             age=28,
             income=45000,
@@ -400,13 +401,13 @@ class TestIntegration(TestCreditApp):
         self.assertTrue(update_success)
         
         # 4. Get user info and score
-        user_data = auth.get_user_info_and_score("integrationuser")
+        user_data = credit_info.get_user_info_and_score("integrationuser")
         self.assertIsNotNone(user_data)
         self.assertEqual(user_data['username'], "integrationuser")
         self.assertIsNotNone(user_data['credit_info'])
         
         # 5. Get credit advice
-        advice = auth.get_credit_advice("integrationuser")
+        advice = credit_info.get_credit_advice("integrationuser")
         self.assertIsNotNone(advice)
         self.assertIn('credit_score', advice)
         self.assertIn('advice', advice)
