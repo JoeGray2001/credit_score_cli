@@ -1,6 +1,7 @@
 import sys
 from db import init_db
-from auth import register_user, authenticate_user, get_user_info_and_score, update_credit_info, get_credit_advice
+from auth import register_user, authenticate_user
+from credit_info import get_user_info_and_score, update_credit_info, get_credit_advice
 
 def main_menu():
     while True:
