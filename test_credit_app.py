@@ -1,6 +1,5 @@
 import unittest
 import sqlite3
-import os
 import tempfile
 import shutil
 from unittest.mock import patch, MagicMock
