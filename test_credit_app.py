@@ -298,7 +298,7 @@ class TestCreditAdvice(TestCreditApp):
         
         # Should contain advice about high debts
         advice_text = ' '.join(advice['advice'])
-        self.assertIn("debts are high", advice_text.lower())
+        self.assertIn("your debt-to-income ratio is high", advice_text.lower())
     
     def test_get_credit_advice_missed_payments(self):
         """Test advice for user with missed payments."""
@@ -320,26 +320,6 @@ class TestCreditAdvice(TestCreditApp):
         advice_text = ' '.join(advice['advice'])
         self.assertIn("missed payment", advice_text.lower())
     
-    def test_get_credit_advice_low_income(self):
-        """Test advice for user with low income."""
-        # Update with low income scenario
-        auth.update_credit_info(
-            username="testuser",
-            age=25,
-            income=3000,  # Low income
-            debts=1000,
-            missed_payments=0,
-            employment_length_years=1,
-            credit_history_years=2
-        )
-        
-        advice = auth.get_credit_advice("testuser")
-        self.assertIsNotNone(advice)
-        
-        # Should contain advice about low income
-        advice_text = ' '.join(advice['advice'])
-        self.assertIn("income is relatively low", advice_text.lower())
-    
     def test_get_credit_advice_good_profile(self):
         """Test advice for user with good credit profile."""
         # Update with good credit profile
@@ -356,9 +336,9 @@ class TestCreditAdvice(TestCreditApp):
         advice = auth.get_credit_advice("testuser")
         self.assertIsNotNone(advice)
         
-        # Should contain positive advice
+        # Positive advice
         advice_text = ' '.join(advice['advice'])
-        self.assertIn("looks good", advice_text.lower())
+        self.assertIn("excellent", advice_text.lower())
     
     def test_get_credit_advice_no_credit_info(self):
         """Test advice for user with no credit info."""
@@ -399,15 +379,15 @@ class TestIntegration(TestCreditApp):
     
     def test_complete_user_workflow(self):
         """Test complete user registration, login, and credit info workflow."""
-        # 1. Register user
+        # Register user
         register_success = auth.register_user("integrationuser", "password123", "Integration User", "integration@test.com")
         self.assertTrue(register_success)
         
-        # 2. Authenticate user
+        # Authenticate user
         auth_success = auth.authenticate_user("integrationuser", "password123")
         self.assertTrue(auth_success)
         
-        # 3. Update credit info
+        # Update credit info
         update_success = auth.update_credit_info(
             username="integrationuser",
             age=28,
@@ -437,5 +417,4 @@ class TestIntegration(TestCreditApp):
         self.assertLessEqual(credit_score, 850)
 
 if __name__ == '__main__':
-    # Run all tests
     unittest.main(verbosity=2)

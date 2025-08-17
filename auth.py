@@ -2,6 +2,7 @@ import sqlite3
 import hashlib
 import logging
 import math
+import pandas as pd
 from db import get_connection
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
@@ -92,6 +93,7 @@ def calculate_credit_score(income, debts, missed_payments):
         score -= missed_payments * 30 
     return max(300, min(score, 850))
 """
+# Credit scoring model V2
 
 def calculate_credit_score_v2(
     age,
@@ -102,10 +104,10 @@ def calculate_credit_score_v2(
     credit_history_years #not used yet
 ):
     """
-    Calculates a realistic credit score based on a simulated Weight of Evidence (WoE) scorecard.
+    Calculates a realistic credit score based on a simulated Weight of Evidence (WoE) score
     """
     logging.debug("Calculating credit score v2.")
-    # Basic validation
+
     for label, value in [
         ("age", age), ("income", income), ("debts", debts),
         ("missed_payments", missed_payments),
@@ -122,13 +124,13 @@ def calculate_credit_score_v2(
     else:
         dti = 1.0 # DTI = 0 if income is 0
 
-    # Simulated WoE
+    # simulate WoE mapping for the different credit features (maps to risk scores)
 
     dti_woe_map = {
         (0, 0.2): -0.85, # DTI < 20% (low risk)
-        (0.2, 0.35): -0.25, # DTI 20%-35% (medium risk)
-        (0.35, 0.5): 0.45, # DTI 35%-50% (high risk)
-        (0.5, float('inf')): 1.1 # DTI > 50% (very high risk)
+        (0.2, 0.35): -0.25, # medium risk
+        (0.35, 0.5): 0.45, # high risk
+        (0.5, float('inf')): 1.1 # very high risk
     }
 
     age_woe_map = {
@@ -146,7 +148,7 @@ def calculate_credit_score_v2(
     }
 
     employment_length_woe_map = {
-        (0, 1): 0.7,        # < 1 year
+        (0, 1): 0.7,
         (1, 4): 0.1,
         (4, 8): -0.3,
         (8, float('inf')): -0.65 # > 8 years
@@ -154,13 +156,12 @@ def calculate_credit_score_v2(
 
     # Get WoE value for each feature 
     def get_woe(value, woe_map):
-        """Helper to find the WoE value from a map."""
         if isinstance(list(woe_map.keys())[0], tuple): 
             for (lower, upper), woe in woe_map.items():
                 if lower <= value < upper:
                     return woe
-            return 0 # Default if not in range
-        else: # Direct lookup map
+            return 0 
+        else:
             return woe_map.get(value, woe_map.get(max(woe_map.keys()))) # Default to highest risk bin if value exceeds keys
 
 
@@ -171,21 +172,23 @@ def calculate_credit_score_v2(
         get_woe(employment_length_years, employment_length_woe_map)
     )
 
-    # simulate the output of a logistic regression model and scale it.
+    # simulate output of a logistic regression model
     # Assume all coefficients are 1 and are absorbed into the WoE values for simplicity.
-    intercept = -0.5 # A pre-calculated model intercept
+    intercept = -0.5 # pre-calculated intercept
     log_odds = intercept + woe_sum
 
     #  300-850 standard credit score range.
     # target a score of 600 for odds of 50:1, with 20 points doubling the odds.
-    factor = 20 / math.log(2)  # PDO (Points to Double Odds)
+    factor = 20 / math.log(2)
     offset = 600 - (factor * math.log(50))
 
     score = offset - (factor * log_odds)
 
     # keep score in 300 - 850 range
     final_score = int(max(300, min(score, 850)))
+
     logging.debug(f"Calculated credit score: {final_score} for user with age {age}, income {income}, debts {debts}, missed_payments {missed_payments}, employment_length_years {employment_length_years}, credit_history_years {credit_history_years}.")
+
     return final_score
 
 
@@ -202,10 +205,7 @@ def update_credit_info(username: str, age: int, income: float, debts: float,
                 logging.debug(f"User '{username}' not found for update.")
                 return False
             user_id = user[0]
-            credit_score = calculate_credit_score_v2(
-                age, income, debts, missed_payments,
-                employment_length_years, credit_history_years
-            )
+            credit_score = calculate_credit_score_v2(age, income, debts, missed_payments, employment_length_years, credit_history_years)
             c.execute(
                 "INSERT INTO credit_info (user_id, age, income, debts, missed_payments, employment_length_years, credit_history_years, credit_score, last_updated) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))",
@@ -267,14 +267,6 @@ def get_credit_advice(username: str):
         elif employment_length_years >= 8:
             advice.append("Your long employment history positively impacts your credit score.")
 
-        if debts and debts > 0:
-            advice.append(f"Your debts are high (R{debts:.2f}). Paying down debts will improve your score.")
-        if missed_payments and missed_payments > 0:
-            advice.append(f"You have {missed_payments} missed payment(s). Avoid missing payments to improve your score.")
-        if income and income < 5000:
-            advice.append(f"Your income is relatively low (R{income:.2f}). Increasing your income can help your score.")
-        if not advice:
-            advice.append("Your credit score looks good! Keep up the good work.")
 
         logging.debug(f"Advice generated for '{username}'.")
         return {
@@ -284,3 +276,80 @@ def get_credit_advice(username: str):
     except sqlite3.Error as e:
         logging.error(f"Database error during get_credit_advice: {e}")
         raise
+
+
+#### Pandas summaries
+
+def user_credit_history_df(username: str):
+    """
+    Return a Pandas DataFrame of the user's credit history with useful derived columns.
+    """
+    logging.debug(f"Loading credit history (Pandas) for '{username}'.")
+    with get_connection() as conn:
+        df = pd.read_sql_query(
+            """
+            SELECT ci.last_updated,
+                   ci.age, ci.income, ci.debts, ci.missed_payments,
+                   ci.employment_length_years, ci.credit_history_years,
+                   ci.credit_score
+            FROM credit_info AS ci
+            JOIN users AS u ON u.id = ci.user_id
+            WHERE u.username = ?
+            ORDER BY ci.last_updated
+            """,
+            conn,
+            params=(username,)
+        )
+
+    if df.empty:
+        logging.debug(f"No credit history found for '{username}'.")
+        return df
+
+    # Basic cleaning/derived metrics
+    df["last_updated"] = pd.to_datetime(df["last_updated"], errors="coerce")
+    df["dti"] = (df["debts"] / df["income"]).where(df["income"] > 0, 1.0).clip(0, 10)
+    df["score_change"] = df["credit_score"].diff().fillna(0)
+    df["score_3pt_ma"] = df["credit_score"].rolling(window=3, min_periods=1).mean().round()
+
+    logging.debug(f"Loaded {len(df)} rows for '{username}'.")
+    return df
+
+
+def user_summary_stats(username: str):
+    """
+    Compute simple numeric summaries with Pandas and return a dict ready to print/log.
+    """
+    df = user_credit_history_df(username)
+    if df.empty:
+        return {"message": "No credit history yet."}
+
+    stats = {
+        "observations": int(len(df)),
+        "current_score": int(df["credit_score"].iloc[-1]),
+        "best_score": int(df["credit_score"].max()),
+        "worst_score": int(df["credit_score"].min()),
+        "avg_score": float(df["credit_score"].mean()),
+        "score_std": float(df["credit_score"].std(ddof=0)),
+        "avg_dti": float(df["dti"].mean()),
+        "last_updated": (
+            df["last_updated"].max().isoformat()
+            if df["last_updated"].notna().any()
+            else None
+        ),
+    }
+    return stats
+
+
+def export_user_history_csv(username: str, path: str = None):
+    """
+    export the panda DB summary as a csv file
+    """
+    import os
+    df = user_credit_history_df(username)
+    if df.empty:
+        return None
+    if path is None:
+        safe_user = "".join(ch for ch in username if ch.isalnum() or ch in ("-", "_"))
+        path = f"{safe_user}_credit_history.csv"
+    df.to_csv(path, index=False)
+    return os.path.abspath(path)
