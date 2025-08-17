@@ -2,6 +2,7 @@ import pandas as pd
 import logging
 import math
 import sqlite3
+import os
 from db import get_connection
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
@@ -57,7 +58,7 @@ def calculate_credit_score_v2(
     debts,
     missed_payments,
     employment_length_years,
-    credit_history_years #not used yet
+    credit_history_years #not used yet in calculation
 ):
     """
     Calculates a realistic credit score based on a simulated Weight of Evidence (WoE) score
@@ -278,7 +279,6 @@ def user_summary_stats(username: str):
     df = user_credit_history_df(username)
     if df.empty:
         return {"message": "No credit history yet."}
-
     stats = {
         "observations": int(len(df)),
         "current_score": int(df["credit_score"].iloc[-1]),
@@ -300,7 +300,6 @@ def export_user_history_csv(username: str, path: str = None):
     """
     export the panda DB summary as a csv file
     """
-    import os
     df = user_credit_history_df(username)
     if df.empty:
         return None
